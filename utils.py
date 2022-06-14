@@ -38,12 +38,12 @@ class PenInWall(Pen):
         super().__init__()
         self.color('black', 'white')
 
-class Source(Pen):
+class SourceDraw(Pen):
     def __init__(self):
         super().__init__()
         self.color('black', 'blue')
         
-class Dst(Pen):
+class DstDraw(Pen):
     def __init__(self):
         super().__init__()
         self.color('black', 'red')

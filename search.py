@@ -1,3 +1,4 @@
+from collections import deque
 import queue
 import numpy as np
 from math import *
@@ -7,20 +8,16 @@ def manhattan(x,y):
     return abs(x[0] - y[0]) + abs(x[1] - y[1])
 
 class Search:
-    def __init__(self, width, height, start, end, center):
-        self.width = width
-        self.height =  height
-        self.start = start
-        self.end = end
-        self.center = center
-        self.path = ''
+    def __init__(self, maze):
+        self.maze = maze
+        self.path = []
+        self.draw_list = deque()
 
-    def create_maze(self, obstace):
-        self.obstace = obstace
-        self.maze = np.zeros((self.height, self.width))
-        self.maze[self.end[1],self.end[0]] = 2
-        for obj in self.obstace:
-            self.maze[obj[1],obj[0]] = 1
+    def create_maze(self):
+        self.maze_map = np.zeros((self.height, self.width))
+        self.maze_map[self.end[1],self.end[0]] = 2
+        for obj in self.maze.obstace:
+            self.maze_map[obj[1],obj[0]] = 1
     
     def move(self, move, i,j):
         if move == "L":
@@ -38,25 +35,27 @@ class Search:
         return i, j
 
     def valid(self, moves):
-        self.tmp = self.maze.copy()
-        i,j = self.start
+        i,j = self.maze.src_pos
         for move in moves:
             i,j = self.move(move,i,j)
             if not(0 < i < self.width -1 and 0 < j < self.height - 1):
                 return False
-            elif (self.tmp[j][i] == 1):
+            elif (self.maze_map[j][i] == 1):
                 return False
             # self.tmp[j][i] = 1
         return True
 
     def findEnd(self, moves):
-        j,i = self.start
+        j,i = self.maze_map.src_pos
         for move in moves:
             i,j = self.move(move,i,j)
 
-        if self.maze[j][i] == 2:
+        if self.maze_map[j][i] == 2:
             print("Found: " + moves)
-            self.path = moves
+            # self.path = moves
+            for move in moves:
+               i,j = self.move(move,i,j)
+               self.path.append((i,j,'olive')) 
             return True
 
         return False
@@ -64,33 +63,14 @@ class Search:
     def find(self):
         pass
 
-    def normalize(self, x,y):
-
-        if isinstance(x,list):
-            x,y = x 
-        x = (x - self.center[0]) * TILE_SIZE
-        y = (self.center[1] - y) * TILE_SIZE
-        return x,y
-
-    def draw(self, i,j, draw):
-        screen_x,screen_y = self.normalize(i, j)
-        draw.color('black','pink') 
-        self._draw((screen_x,screen_y),draw)
-    
-    def _draw(self, pos, draw):
-        draw.goto(pos[0],pos[1])
-        draw.pendown()
-        draw.stamp()    
-        draw.penup()
-
 
 class BFS(Search):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def find(self, draw):
+    def find(self):
         visited = set()
-        i,j = self.start
+        i,j = self.maze.src_pos
         nums = queue.Queue()
         nums.put(("", i, j))
         add = ""
@@ -98,7 +78,8 @@ class BFS(Search):
         while not self.findEnd(add):
             add, i, j = nums.get()
             # print(add)
-            self.draw(i,j, draw)
+            # self.draw(i,j, draw)
+            self.draw_list.append((i,j))
             for move in ["L","R","U","D"]:
                 put = add + move
                 i_new, j_new = self.move(move, i, j)

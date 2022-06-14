@@ -2,55 +2,73 @@ from turtle import Screen, Turtle, shape
 from utils import *
 from math import *
 from search import *
+from collections import deque
 
-class Draw:
-    def __init__(self, shape, center, src_pos, dst_pos, method):
+class NormalizeCenter:
+    def __call__(self, x,y, center):
+        if isinstance(x,list):
+            x,y = x 
+        x = (x - center[0]) * TILE_SIZE
+        y = (center[1] - y) * TILE_SIZE
+        return x,y
+
+class Maze:
+    def __init__(self, shape, center):
         self.shape = shape
         self.center = center
-        self.src_pos = src_pos
-        self.dst_pos = dst_pos
         self.obstace = []
+        self.draw_list = deque()
         self._maze_size()
-        self.method = method(self.maze_width,self.maze_height,src_pos,dst_pos, center)
-
+    
     def _maze_size(self):
         self.maze_width, self.maze_height = map(int,shape.split(' ')) 
         self.maze_width +=2
         self.maze_height +=2
     
-    def normalize(self, x,y):
-        if isinstance(x,list):
-            x,y = x 
-        x = (x - self.center[0]) * TILE_SIZE
-        y = (self.center[1] - y) * TILE_SIZE
-        return x,y
-
-    def setup_maze(self, wall_draw, bg_draw):
+    def setup_maze(self, normalize):
         ''' Conversion from the list to the map in turtle. '''
 
         for y in range(self.maze_height):
             for x in range(self.maze_width):
-                screen_x, screen_y = self.normalize(x,y)
+                screen_x, screen_y = normalize(x,y, self.center)
                 if x == 0 or x == self.maze_width-1 or y == 0 or y == self.maze_height-1:
-                    wall_draw.goto(screen_x, screen_y)
-                    wall_draw.stamp()
-
+                    self.draw_list.append((screen_x,screen_y,"grey"))
                 else:
-                    bg_draw.goto(screen_x, screen_y)
-                    bg_draw.stamp()
+                    self.draw_list.append((screen_x,screen_y,"white"))
 
-    def _draw(self, pos, draw):
-        draw.goto(pos[0],pos[1])
-        draw.pendown()
-        draw.stamp()  
+class Position:
+    def __init__(self, pos = (0,0)):
+        self.pos = pos
+        self.draw_list = deque()
+        self.draw_list.append((*self.pos,'blue'))
+    def asign_to_object(self, object):
+        pass
 
-    def setup_position(self, src_draw, dst_draw):
-        screen_x_src,screen_y_src = self.normalize(self.src_pos, None) 
-        screen_x_dst, screen_y_dst = self.normalize(self.dst_pos, None)
-        self._draw((screen_x_src,screen_y_src),src_draw)
-        self._draw((screen_x_dst,screen_y_dst),dst_draw)
+class Source(Position):
+    def __init__(self,*args, **kwargs):
+        super(Source,self).__init__(*args, **kwargs)
+    
+    def asign_to_object(self, object):
+        object.src_pos = self.pos
+    def setup(self, normalize):
+        self.draw_list.append((*self.pos,'blue'))
 
-    def point_line(self, x1,x2):
+    
+
+class Target(Position):
+    def __init__(self,*args, **kwargs):
+        super(Target,self).__init__(*args, **kwargs)
+        self.draw_list.append((*self.pos,'red'))
+
+    def asign_to_object(self, object):
+        object.dst_pos = self.pos
+
+class Polygon:
+    def __init__(self, maze):
+        self.maze = maze
+        self.draw_list = deque()
+
+    def point_line(self, x1, x2):
 
         dis_x = x1[0] - x2[0]
         dis_y = x1[1] - x2[1]
@@ -92,9 +110,9 @@ class Draw:
                 break
             points.append([floor(start_x), floor(start_y)])
 
-        return points
+        return points 
 
-    def drawPolygon(self, arr, draw):
+    def setup_polygon(self, arr, normalize):
         ind = 0
         while True:
             if ind == len(arr) -2:
@@ -103,51 +121,38 @@ class Draw:
                 points = self.point_line(arr[ind:ind+2],arr[ind+2:ind+4])
            
             for i, pos in enumerate(points):
+                x,y = normalize(*pos,self.maze.center)
                 if i in [0,1]:
-                    draw.color('black', 'orange')
+                    self.draw_list.append((x,y,'orange'))
                 else:
-                    draw.color('black', 'yellow')
-                x,y = self.normalize(pos,None)
-                draw.goto(x,y)
-                draw.pendown()
-                draw.stamp()
-                draw.penup()
-                self.obstace.append(pos)
+                    self.draw_list.append((x,y,'yellow'))
+                
+                self.maze.obstace.append(pos)
             
             ind = ind + 2
             if ind >= len(arr) -1:
                 break
 
-    def drawPath(self, moves, draw):
-        i,j = self.src_pos
-        for move in moves[:-1]: 
-            if move == "L":
-                i -= 1
 
-            elif move == "R":
-                i += 1
+class Draw():
 
-            elif move == "U":
-                j -= 1
+    def draw(self, pen, draw_oject):
+        while len(draw_oject.draw_list) != 0:
+            x,y , color = draw_oject.draw_list.popleft()
+            pen.color('black',color)
+            pen.goto(x,y)
+            pen.pendown()
+            pen.stamp()
+            pen.penup()
 
-            elif move == "D":
-                j += 1
-
-            draw.color('black','olive')
-
-            screen_x,screen_y = self.normalize(i, j) 
-            self._draw((screen_x,screen_y),draw) 
-        print("Cost of Path is:", len(moves))
-
-    def search(self, draw):
-        self.method.create_maze(self.obstace)
-        self.method.find(draw)
-        self.drawPath(self.method.path, draw)
-    
-    def iterSearch(self, draw, maxLen):
-        self.method.create_maze(self.obstace)
-        self.method.iterFind(draw,maxLen)
-        self.drawPath(self.method.path, draw)
+class DrawPath():
+    def draw(self, pen, draw_oject, path, normalize):
+        for x,y, color in draw_oject.path:
+            pen.color('black',color)
+            pen.goto(x,y)
+            pen.pendown()
+            pen.stamp()
+            # pen.penup()
 
 if __name__ == "__main__":
   
@@ -160,19 +165,45 @@ if __name__ == "__main__":
     
     wall_draw = PenWall()
     bg_draw = PenInWall()
-    src_draw = Source()
-    dst_draw = Dst()
+    src_draw = SourceDraw()
+    dst_draw = DstDraw()
     pen_poly = PenPoly()
 
-    draw = Draw(shape, (maze_width/2,maze_height/2),src_pos, des_pos, BFS)
+    # draw = Draw(shape, (maze_width/2,maze_height/2),src_pos, des_pos, BFS)
 
-    draw.setup_maze(wall_draw, bg_draw)
-    draw.setup_position(src_draw, dst_draw)
+    # draw.setup_maze(wall_draw, bg_draw)
+    # draw.setup_position(src_draw, dst_draw)
+    # for obj in obstace:
+    #     obj_list = list(map(int,obj.split(' ')))
+    #     draw.drawPolygon(obj_list, pen_poly)
+    # # draw.iterSearch(PenPath(), 40)
+    # draw.search(PenPath())
+
+    normalize = NormalizeCenter()
+    maze = Maze(shape, (maze_width/2,maze_height/2))
+    maze.setup_maze(normalize)
+    draw = Draw()
+    draw_path = DrawPath()
+    draw.draw(wall_draw, maze)
+    polygon = Polygon(maze)
     for obj in obstace:
         obj_list = list(map(int,obj.split(' ')))
-        draw.drawPolygon(obj_list, pen_poly)
-    # draw.iterSearch(PenPath(), 40)
-    draw.search(PenPath())
+        polygon.setup_polygon(obj_list, normalize)
+    
+    draw.draw(pen_poly,polygon)
+    source = Source(src_pos)
+    source.asign_to_object(maze)
+    target = Target(des_pos)
+    target.asign_to_object(maze)
+    draw.draw(src_draw, source)
+    draw.draw(src_draw, target)
+
+    search = BFS(maze)
+    search.find()
+    draw.draw(PenPath(), search)
+
+    # draw.join()
+
     screen.mainloop()
 
     # print(point_line([4,4],[5,9]))
